@@ -1,0 +1,52 @@
+run:
+  timeout: 2m
+issues:
+  # Show all errors.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters-settings:
+  gofumpt:
+    extra-rules: true
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/deckhouse/)
+  goimports:
+    local-prefixes: github.com/deckhouse/
+  errcheck:
+    ignore: fmt:.*,[rR]ead|[wW]rite|[cC]lose,io:Copy
+  revive:
+    rules:
+      - name: dot-imports
+        disabled: true
+
+linters:
+  disable-all: true
+  enable:
+  - asciicheck
+  - bidichk
+  - bodyclose
+  - dogsled
+  - errcheck
+  - errname
+  - errorlint
+  - exportloopref
+  - gci
+  - gocritic
+  - gofmt
+  - gofumpt
+  - goimports
+  - gosimple
+  - govet
+  - ineffassign
+  - misspell
+  - nolintlint
+  - revive
+  - staticcheck
+  - typecheck
+  - unconvert
+  - unparam
+  - unused
+  - whitespace

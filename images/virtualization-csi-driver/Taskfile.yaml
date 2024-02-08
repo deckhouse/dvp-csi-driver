@@ -1,0 +1,58 @@
+# https://taskfile.dev
+
+version: "3"
+
+silent: true
+
+env:
+  CSI_IMAGE: dev-registry.deckhouse.io/virt/dev/virtualization-csi-driver:latest
+  CSI_BUILDER_IMAGE: virtualization-csi-driver-builder:latest
+
+tasks:
+  build:cache:
+    desc: "Build CSI cache"
+    cmds:
+      - |
+        echo "Build cache image $CSI_BUILDER_IMAGE ..."
+        docker build . \
+          --target builder \
+          --platform linux/amd64 \
+          -t ${CSI_BUILDER_IMAGE}
+
+  push:
+    desc: "Build CSI image and push to registry"
+    deps:
+      - build:cache
+    cmds:
+      - |
+        echo "Build CSI image $CSI_IMAGE ..."
+        docker build . \
+          --build-arg BUILDER_CACHE_IMAGE=${CSI_BUILDER_IMAGE} \
+          --platform linux/amd64 \
+          -t ${CSI_IMAGE}
+      - |
+        echo "Push CSI image $CSI_IMAGE_NAME ..."
+        docker push ${CSI_IMAGE}
+
+  lint:
+    desc: "Run linters locally"
+    cmds:
+      - task: lint:go
+
+  lint:go:
+    desc: "Run golangci-lint"
+    deps:
+      - _ensure:golangci-lint
+    cmds:
+      - |
+        golangci-lint run --sort-results
+
+  _ensure:golangci-lint:
+    desc: "Ensure golangci-lint is available"
+    cmds:
+      - |
+        echo -e >&2 "Please install golangci-lint https://golangci-lint.run/usage/install/"
+        exit 1
+    status:
+      - |
+        [ -f ./golangci-lint ] || which golangci-lint

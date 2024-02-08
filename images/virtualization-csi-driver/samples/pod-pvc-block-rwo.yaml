@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-block-rwo
+spec:
+  storageClassName: virtualization-storage-class
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+  volumeMode: Block
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: deploy-block-rwo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deploy-block-rwo
+  template:
+    metadata:
+      labels:
+        app: deploy-block-rwo
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: vm-01
+      containers:
+        - name: task-nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+              name: "http-server"
+          volumeDevices:
+            - devicePath: "/dev/storage"
+              name: storage
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: pvc-block-rwo

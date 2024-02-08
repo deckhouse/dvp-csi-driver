@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: virtualization-csi-driver
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: virtualization-csi-driver
+rules:
+- apiGroups:
+  - virtualization.deckhouse.io
+  resources:
+  - virtualmachinedisks
+  - virtualmachineblockdeviceattachments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+- apiGroups:
+    - virtualization.deckhouse.io
+  resources:
+    - virtualmachinedisks/status
+    - virtualmachineblockdeviceattachments/status
+  verbs:
+    - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: virtualization-csi-driver
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: virtualization-csi-driver
+subjects:
+  - kind: ServiceAccount
+    name: virtualization-csi-driver
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: virtualization-csi-driver-secret
+  annotations:
+    kubernetes.io/service-account.name: virtualization-csi-driver
+type: kubernetes.io/service-account-token

@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: virtualization-csi-driver
+  namespace: {{ .Values.guest.csiDriverNamespace }}
+spec:
+  selector:
+    matchLabels:
+      app: virtualization-csi-driver-registrar
+  template:
+    metadata:
+      labels:
+        app: virtualization-csi-driver-registrar
+      name: virtualization-csi-driver
+      namespace: default
+    spec:
+      containers:
+        - name: virtualization-csi-driver
+          image: dev-registry.deckhouse.io/virt/dev/virtualization-csi-driver:latest
+          command:
+            - /virtualization-csi-driver
+          args:
+            - "--debug"
+            - "--endpoint=unix:///csi/csi.sock"
+          imagePullPolicy: Always
+          env:
+            - name: HOST_NAMESPACE
+              value: {{ .Values.host.virtualMachineNamespace }}
+            - name: HOST_KUBECONFIG
+              value: {{ .Values.host.kubeconfig }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          securityContext:
+            capabilities:
+              add:
+                - SYS_ADMIN
+            privileged: true
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi/
+            - name: publish-dir
+              mountPath: /var/lib/kubelet
+              mountPropagation: Bidirectional
+            - name: device-dir
+              mountPath: /dev
+        - name: csi-driver-registrar
+          image: gcr.io/k8s-staging-sig-storage/csi-node-driver-registrar:canary
+          args:
+            - "--v=5"
+            - "--http-endpoint=:8080"
+            - "--csi-address=/csi/csi.sock"
+            - "--kubelet-registration-path=/var/lib/kubelet/plugins/virtualization.csi.driver.io/csi.sock"
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+          ports:
+            - containerPort: 8080
+              name: healthz
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
+      imagePullSecrets:
+        - name: dev-registry-secret
+      volumes:
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: Directory
+        - name: plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/virtualization.csi.driver.io/
+            type: DirectoryOrCreate
+        - name: device-dir
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: publish-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory

@@ -1,0 +1,3 @@
+apiVersion: v2
+name: virtualization-csi-driver-guest
+version: 0.0.1

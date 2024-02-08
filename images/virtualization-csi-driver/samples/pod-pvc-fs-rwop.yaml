@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-fs-rwop
+spec:
+  storageClassName: virtualization-storage-class
+  accessModes:
+    - ReadWriteOncePod
+  resources:
+    requests:
+      storage: 500Mi
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvc-fs-rwop
+spec:
+  containers:
+    - name: task-nginx
+      image: nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+        - mountPath: "/storage"
+          name: storage
+  volumes:
+    - name: storage
+      persistentVolumeClaim:
+        claimName: pvc-fs-rwop

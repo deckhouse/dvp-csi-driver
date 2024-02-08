@@ -1,0 +1,63 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: virtualization-csi-driver
+  namespace: {{ .Values.guest.csiDriverNamespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: virtualization-csi-driver
+  template:
+    metadata:
+      labels:
+        app: virtualization-csi-driver
+    spec:
+      serviceAccount: virtualization-csi-driver
+      containers:
+        - name: virtualization-csi-driver
+          image: dev-registry.deckhouse.io/virt/dev/virtualization-csi-driver:latest
+          command:
+            - /virtualization-csi-driver
+          args:
+            - "--debug"
+            - "--endpoint=unix:///csi/csi.sock"
+          imagePullPolicy: Always
+          env:
+            - name: HOST_NAMESPACE
+              value: {{ .Values.host.virtualMachineNamespace }}
+            - name: HOST_KUBECONFIG
+              value: {{ .Values.host.kubeconfig }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi/
+        - name: csi-provisioner
+          image: gcr.io/k8s-staging-sig-storage/csi-provisioner:canary
+          args:
+            - "--v=5"
+            - "--csi-address=/csi/csi.sock"
+            - "--timeout=1m"
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi/
+        - name: csi-attacher
+          image: gcr.io/k8s-staging-sig-storage/csi-attacher:canary
+          args:
+            - "--v=5"
+            - "--csi-address=/csi/csi.sock"
+            - "--timeout=1m"
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi/
+      imagePullSecrets:
+        - name: dev-registry-secret
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
