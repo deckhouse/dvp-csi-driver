@@ -8,6 +8,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/deckhouse/virtualization-csi-driver/pkg/host"
 )
@@ -25,7 +26,13 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		}
 	}
 
-	disk, err := d.hostCluster.CreateDisk(ctx, req.Name, req.CapacityRange.RequiredBytes)
+	var storageClass *string
+	dvpStorageClass, ok := req.GetParameters()["dvpStorageClass"]
+	if ok {
+		storageClass = &dvpStorageClass
+	}
+
+	disk, err := d.hostCluster.CreateDisk(ctx, req.Name, req.CapacityRange.RequiredBytes, storageClass)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk: %w", err)
 	}
@@ -48,6 +55,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	}, nil
 }
 
+// DeleteVolume TODO: deleting in process of creation.
 func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	disk, err := d.hostCluster.DeleteDisk(ctx, req.VolumeId)
 	if err != nil {
@@ -115,13 +123,16 @@ func (d *Driver) ListVolumes(_ context.Context, _ *csi.ListVolumesRequest) (*csi
 }
 
 func (d *Driver) GetCapacity(_ context.Context, _ *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	return nil, errors.New("not implemented")
+	return &csi.GetCapacityResponse{
+		AvailableCapacity: 10 * 1024 * 1024,
+	}, nil
 }
 
 func (d *Driver) ControllerGetCapabilities(_ context.Context, _ *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	capabilities := []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
+		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	}
 
 	csiCaps := make([]*csi.ControllerServiceCapability, len(capabilities))
@@ -152,8 +163,46 @@ func (d *Driver) ListSnapshots(_ context.Context, _ *csi.ListSnapshotsRequest) (
 	return nil, errors.New("not implemented")
 }
 
-func (d *Driver) ControllerExpandVolume(_ context.Context, _ *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	return nil, errors.New("not implemented")
+// ResizeDelta TODO: for what?
+const ResizeDelta = "32Mi"
+
+func (d *Driver) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	volumeID := req.GetVolumeId()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume id cannot be empty")
+	}
+
+	err := d.hostCluster.WaitDiskCreation(ctx, req.VolumeId)
+	if err != nil {
+		return nil, err
+	}
+
+	vmd, err := d.hostCluster.GetDisk(ctx, req.VolumeId)
+	if err != nil {
+		return nil, err
+	}
+
+	requiredCapacity := resource.NewQuantity(req.CapacityRange.GetRequiredBytes(), resource.BinarySI)
+
+	nodeExpansionRequired := req.GetVolumeCapability().GetBlock() == nil
+
+	if vmd.Capacity.Value() > requiredCapacity.Value() {
+		// TODO: no decrease.
+		return &csi.ControllerExpandVolumeResponse{
+			CapacityBytes:         vmd.Capacity.Value(),
+			NodeExpansionRequired: nodeExpansionRequired,
+		}, nil
+	}
+
+	err = d.hostCluster.UpdateDiskCapacity(ctx, req.VolumeId, requiredCapacity)
+	if err != nil {
+		return nil, err
+	}
+
+	return &csi.ControllerExpandVolumeResponse{
+		CapacityBytes:         req.CapacityRange.RequiredBytes,
+		NodeExpansionRequired: nodeExpansionRequired,
+	}, nil
 }
 
 func (d *Driver) ControllerGetVolume(_ context.Context, _ *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {

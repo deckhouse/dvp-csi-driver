@@ -111,6 +111,20 @@ func (m *Mounter) Unmount(target string) error {
 	return nil
 }
 
+func (m *Mounter) ResizeFS(mountTarget string) error {
+	devicePath, _, err := mu.GetDeviceNameFromMount(m.mutils.Interface, mountTarget)
+	if err != nil {
+		return fmt.Errorf("failed to find the device mounted at %s: %w", mountTarget, err)
+	}
+
+	_, err = mu.NewResizeFs(m.mutils.Exec).Resize(devicePath, mountTarget)
+	if err != nil {
+		return fmt.Errorf("failed to resize filesystem %s on device %s: %w", mountTarget, devicePath, err)
+	}
+
+	return nil
+}
+
 const devicesByIDPath = "/dev/disk/by-id/"
 
 func (m *Mounter) GetBlockDevicePathByID(id string) (string, error) {

@@ -18,13 +18,15 @@ func main() {
 		panic(err)
 	}
 
-	var endpoint string
-	flag.StringVar(&endpoint, "endpoint", "", "CSI endpoint")
+	var csiEndpoint string
+	flag.StringVar(&csiEndpoint, "csi-endpoint", "", "CSI endpoint")
+	var livenessEndpoint string
+	flag.StringVar(&livenessEndpoint, "liveness-endpoint", "", "Liveness endpoint")
 	var isDebugMode bool
 	flag.BoolVar(&isDebugMode, "debug", false, "debug mode")
 	flag.Parse()
 
-	if endpoint == "" {
+	if csiEndpoint == "" {
 		panic(errors.New("CSI endpoint missed but required"))
 	}
 
@@ -33,7 +35,7 @@ func main() {
 		opts = append(opts, logger.NewDebugOption())
 	}
 
-	csi, err := driver.New(endpoint, hostCluster, logger.New(opts))
+	csi, err := driver.New(csiEndpoint, livenessEndpoint, hostCluster, logger.New(opts))
 	if err != nil {
 		panic(err)
 	}
@@ -48,5 +50,8 @@ func main() {
 
 	<-exit
 
-	csi.Stop()
+	err = csi.Stop()
+	if err != nil {
+		panic(err)
+	}
 }

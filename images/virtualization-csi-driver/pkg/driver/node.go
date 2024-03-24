@@ -64,13 +64,44 @@ func (d *Driver) NodeGetVolumeStats(_ context.Context, _ *csi.NodeGetVolumeStats
 	return &csi.NodeGetVolumeStatsResponse{}, nil
 }
 
-func (d *Driver) NodeExpandVolume(_ context.Context, _ *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	return &csi.NodeExpandVolumeResponse{}, nil
+func (d *Driver) NodeExpandVolume(_ context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	volumeID := req.GetVolumeId()
+	volumePath := req.GetVolumePath()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "volume id cannot be empty")
+	}
+	if len(volumePath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "volume Path cannot be empty")
+	}
+
+	err := d.mounter.ResizeFS(volumePath)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &csi.NodeExpandVolumeResponse{
+		// TODO: CapacityBytes: X,
+	}, nil
 }
 
 func (d *Driver) NodeGetCapabilities(_ context.Context, _ *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+	capabilities := []csi.NodeServiceCapability_RPC_Type{
+		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+	}
+
+	csiCaps := make([]*csi.NodeServiceCapability, len(capabilities))
+	for i, capability := range capabilities {
+		csiCaps[i] = &csi.NodeServiceCapability{
+			Type: &csi.NodeServiceCapability_Rpc{
+				Rpc: &csi.NodeServiceCapability_RPC{
+					Type: capability,
+				},
+			},
+		}
+	}
+
 	return &csi.NodeGetCapabilitiesResponse{
-		Capabilities: []*csi.NodeServiceCapability{},
+		Capabilities: csiCaps,
 	}, nil
 }
 

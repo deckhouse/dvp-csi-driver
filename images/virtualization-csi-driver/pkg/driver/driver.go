@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -20,11 +21,13 @@ import (
 )
 
 type Driver struct {
-	nodeName string
-	endpoint string
+	nodeName         string
+	csiEndpoint      string
+	livenessEndpoint string
 
 	hostCluster *host.Client
-	server      *grpc.Server
+	grpc        *grpc.Server
+	http        *http.Server
 	mounter     *mounter.Mounter
 
 	logger *slog.Logger
@@ -33,7 +36,7 @@ type Driver struct {
 // New returns a CSI plugin that contains the necessary gRPC
 // interfaces to interact with Kubernetes over unix domain sockets for
 // managaing  disks
-func New(endpoint string, hostCluster *host.Client, logger *slog.Logger) (*Driver, error) {
+func New(csiEndpoint, livenessEndpoint string, hostCluster *host.Client, logger *slog.Logger) (*Driver, error) {
 	nodeName := os.Getenv("NODE_NAME")
 	if nodeName == "" {
 		return nil, errors.New("node name env not found")
@@ -42,18 +45,54 @@ func New(endpoint string, hostCluster *host.Client, logger *slog.Logger) (*Drive
 	logger = logger.WithGroup("driver").With("host-id", nodeName)
 
 	return &Driver{
-		nodeName:    nodeName,
-		endpoint:    endpoint,
-		hostCluster: hostCluster,
-		mounter:     mounter.New(logger),
-		logger:      logger,
+		nodeName:         nodeName,
+		csiEndpoint:      csiEndpoint,
+		livenessEndpoint: livenessEndpoint,
+		hostCluster:      hostCluster,
+		mounter:          mounter.New(logger),
+		logger:           logger,
 	}, nil
 }
 
 func (d *Driver) Start() error {
 	d.logger.Info("Start driver")
 
-	u, err := url.Parse(d.endpoint)
+	err := d.startCSIEndpoint()
+	if err != nil {
+		return err
+	}
+
+	if d.livenessEndpoint != "" {
+		err = d.startLivenessEndpoint()
+		if err != nil {
+			return err
+		}
+	}
+
+	d.logger.Info("Driver started")
+
+	return nil
+}
+
+func (d *Driver) Stop() error {
+	d.logger.Info("Stop driver")
+
+	d.grpc.GracefulStop()
+
+	if d.http != nil {
+		err := d.http.Shutdown(context.Background())
+		if err != nil {
+			return err
+		}
+	}
+
+	d.logger.Info("Driver stopped")
+
+	return nil
+}
+
+func (d *Driver) startCSIEndpoint() error {
+	u, err := url.Parse(d.csiEndpoint)
 	if err != nil {
 		return fmt.Errorf("unable to parse address: %w", err)
 	}
@@ -81,27 +120,44 @@ func (d *Driver) Start() error {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	d.server = grpc.NewServer(grpc.UnaryInterceptor(d.logInterceptor))
-	csi.RegisterIdentityServer(d.server, d)
-	csi.RegisterControllerServer(d.server, d)
-	csi.RegisterNodeServer(d.server, d)
+	d.grpc = grpc.NewServer(grpc.UnaryInterceptor(d.logInterceptor))
+	csi.RegisterIdentityServer(d.grpc, d)
+	csi.RegisterControllerServer(d.grpc, d)
+	csi.RegisterNodeServer(d.grpc, d)
 
 	go func() {
-		err := d.server.Serve(grpcListener)
+		err := d.grpc.Serve(grpcListener)
 		if err != nil {
 			panic(err)
 		}
 	}()
 
-	d.logger.Info("Driver started")
-
 	return nil
 }
 
-func (d *Driver) Stop() {
-	d.logger.Info("Stop driver")
-	d.server.GracefulStop()
-	d.logger.Info("Driver stopped")
+func (d *Driver) startLivenessEndpoint() error {
+	httpListener, err := net.Listen("tcp", d.livenessEndpoint)
+	if err != nil {
+		return fmt.Errorf("failed to listen: %w", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	go func() {
+		err := d.http.Serve(httpListener)
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			panic(err)
+		}
+	}()
+
+	d.http = &http.Server{
+		Handler: mux,
+	}
+
+	return nil
 }
 
 func (d *Driver) logInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {

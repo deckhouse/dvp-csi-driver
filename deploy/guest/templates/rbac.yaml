@@ -15,8 +15,14 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "update"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims/status"]
+    verbs: ["patch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["events"]
@@ -50,5 +56,38 @@ subjects:
     namespace: {{ .Values.guest.csiDriverNamespace }}
 roleRef:
   kind: ClusterRole
+  name: virtualization-csi-driver
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: {{ .Values.guest.csiDriverNamespace }}
+  name: virtualization-csi-driver
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csistoragecapacities"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: virtualization-csi-driver
+  namespace: {{ .Values.guest.csiDriverNamespace }}
+subjects:
+  - kind: ServiceAccount
+    name: virtualization-csi-driver
+    namespace: {{ .Values.guest.csiDriverNamespace }}
+roleRef:
+  kind: Role
   name: virtualization-csi-driver
   apiGroup: rbac.authorization.k8s.io

@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/deckhouse/virtualization/api/v1alpha2"
+	"github.com/deckhouse/virtualization/api/core/v1alpha2"
 )
 
 const (
@@ -36,7 +36,7 @@ func (c *Client) AttachDisk(ctx context.Context, vmdName, vmName string) (*Attac
 	vmbda = &v1alpha2.VirtualMachineBlockDeviceAttachment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha2.VMBDAKind,
-			APIVersion: v1alpha2.APIVersion,
+			APIVersion: v1alpha2.Version,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "vmbda-" + uuid.New().String(),

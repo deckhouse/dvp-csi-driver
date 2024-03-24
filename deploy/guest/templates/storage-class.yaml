@@ -4,7 +4,8 @@ metadata:
   name: virtualization-storage-class
 parameters:
   csi.storage.k8s.io/fstype: "ext4"
-allowVolumeExpansion: false
+  dvpStorageClass: "linstor-test-data-r1"
+allowVolumeExpansion: true
 provisioner: virtualization.csi.driver.io
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
