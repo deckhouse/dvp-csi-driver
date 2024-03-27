@@ -16,13 +16,13 @@ spec:
     spec:
       containers:
         - name: virtualization-csi-driver
+          securityContext:
+            privileged: true
           image: dev-registry.deckhouse.io/virt/dev/virtualization-csi-driver:latest
-          command:
-            - /virtualization-csi-driver
+          imagePullPolicy: Always
           args:
             - "--debug"
-            - "--endpoint=unix:///csi/csi.sock"
-          imagePullPolicy: Always
+            - "--csi-endpoint=unix:///csi/csi.sock"
           env:
             - name: HOST_NAMESPACE
               value: {{ .Values.host.virtualMachineNamespace }}
@@ -33,14 +33,9 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          securityContext:
-            capabilities:
-              add:
-                - SYS_ADMIN
-            privileged: true
           volumeMounts:
             - name: plugin-dir
-              mountPath: /csi/
+              mountPath: /csi
             - name: publish-dir
               mountPath: /var/lib/kubelet
               mountPropagation: Bidirectional
@@ -50,29 +45,33 @@ spec:
           image: gcr.io/k8s-staging-sig-storage/csi-node-driver-registrar:canary
           args:
             - "--v=5"
-            - "--http-endpoint=:8080"
-            - "--csi-address=/csi/csi.sock"
+            - "--csi-address=$(CSI_ENDPOINT)"
+            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
             - "--kubelet-registration-path=/var/lib/kubelet/plugins/virtualization.csi.driver.io/csi.sock"
+          env:
+            - name: CSI_ENDPOINT
+              value: "/csi/csi.sock"
+            - name: DRIVER_REG_SOCK_PATH
+              value: "/var/lib/kubelet/plugins/virtualization.csi.driver.io/csi.sock"
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
             - name: registration-dir
               mountPath: /registration
-          ports:
-            - containerPort: 8080
-              name: healthz
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: healthz
-            initialDelaySeconds: 5
-            timeoutSeconds: 5
       imagePullSecrets:
         - name: dev-registry-secret
       volumes:
         - name: registration-dir
           hostPath:
             path: /var/lib/kubelet/plugins_registry/
+            type: Directory
+        - name: publish-dir
+          hostPath:
+            path: /var/lib/kubelet
             type: Directory
         - name: plugin-dir
           hostPath:
@@ -81,8 +80,4 @@ spec:
         - name: device-dir
           hostPath:
             path: /dev
-            type: Directory
-        - name: publish-dir
-          hostPath:
-            path: /var/lib/kubelet
             type: Directory

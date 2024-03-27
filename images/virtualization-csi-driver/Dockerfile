@@ -14,3 +14,5 @@ RUN GOOS=linux go build -o virtualization-csi-driver ./cmd/virtualization-csi-dr
 FROM alpine:3.18
 RUN apk add --no-cache e2fsprogs xfsprogs findmnt blkid
 COPY --from=builder /app/virtualization-csi-driver /
+
+ENTRYPOINT ["/virtualization-csi-driver"]

@@ -9,18 +9,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/deckhouse/virtualization/api/v1alpha2"
+	"github.com/deckhouse/virtualization/api/core/v1alpha2"
 )
 
 type Disk struct {
-	Name string
+	Name     string
+	Capacity resource.Quantity
 }
 
-func (c *Client) CreateDisk(ctx context.Context, name string, size int64) (*Disk, error) {
+func (c *Client) CreateDisk(ctx context.Context, name string, size int64, storageClass *string) (*Disk, error) {
 	vmd := v1alpha2.VirtualMachineDisk{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha2.VMDKind,
-			APIVersion: v1alpha2.APIVersion,
+			APIVersion: v1alpha2.Version,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -28,7 +29,8 @@ func (c *Client) CreateDisk(ctx context.Context, name string, size int64) (*Disk
 		},
 		Spec: v1alpha2.VirtualMachineDiskSpec{
 			PersistentVolumeClaim: v1alpha2.VMDPersistentVolumeClaim{
-				Size: resource.NewQuantity(size, resource.BinarySI),
+				StorageClassName: storageClass,
+				Size:             resource.NewQuantity(size, resource.BinarySI),
 			},
 		},
 	}
@@ -38,7 +40,9 @@ func (c *Client) CreateDisk(ctx context.Context, name string, size int64) (*Disk
 		return nil, err
 	}
 
-	return &Disk{Name: vmd.Name}, nil
+	return &Disk{
+		Name: vmd.Name,
+	}, nil
 }
 
 func (c *Client) WaitDiskCreation(ctx context.Context, vmdName string) error {

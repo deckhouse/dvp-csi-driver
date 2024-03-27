@@ -17,12 +17,11 @@ spec:
       containers:
         - name: virtualization-csi-driver
           image: dev-registry.deckhouse.io/virt/dev/virtualization-csi-driver:latest
-          command:
-            - /virtualization-csi-driver
+          imagePullPolicy: Always
           args:
             - "--debug"
-            - "--endpoint=unix:///csi/csi.sock"
-          imagePullPolicy: Always
+            - "--csi-endpoint=unix:///csi/csi.sock"
+            - "--liveness-endpoint=:9807"
           env:
             - name: HOST_NAMESPACE
               value: {{ .Values.host.virtualMachineNamespace }}
@@ -33,29 +32,101 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9808
           volumeMounts:
             - name: socket-dir
-              mountPath: /csi/
+              mountPath: /csi
         - name: csi-provisioner
           image: gcr.io/k8s-staging-sig-storage/csi-provisioner:canary
-          args:
-            - "--v=5"
-            - "--csi-address=/csi/csi.sock"
-            - "--timeout=1m"
           imagePullPolicy: "IfNotPresent"
+          args:
+            - "--timeout=600s"
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--feature-gates=Topology=false"
+            - "--default-fstype=ext4"
+            - "--leader-election=true"
+            - "--leader-election-namespace=$(NAMESPACE)"
+            - "--enable-capacity"
+            - "--capacity-ownerref-level=2"
+            - "--worker-threads=10"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
           volumeMounts:
             - name: socket-dir
-              mountPath: /csi/
+              mountPath: /csi
         - name: csi-attacher
           image: gcr.io/k8s-staging-sig-storage/csi-attacher:canary
-          args:
-            - "--v=5"
-            - "--csi-address=/csi/csi.sock"
-            - "--timeout=1m"
           imagePullPolicy: "IfNotPresent"
+          args:
+            - "--timeout=600s"
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--leader-election-namespace=$(NAMESPACE)"
+            - "--worker-threads=10"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
           volumeMounts:
             - name: socket-dir
-              mountPath: /csi/
+              mountPath: /csi
+        - name: resizer
+          image: gcr.io/k8s-staging-sig-storage/csi-resizer:canary
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - "--timeout=600s"
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--leader-election-namespace=$(NAMESPACE)"
+            - "--workers=10"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: liveness-probe
+          imagePullPolicy: Always
+          image: gcr.io/k8s-staging-sig-storage/livenessprobe:canary
+          args:
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
       imagePullSecrets:
         - name: dev-registry-secret
       volumes:
