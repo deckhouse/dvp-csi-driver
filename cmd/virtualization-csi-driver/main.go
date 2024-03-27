@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/deckhouse/virtualization-csi-driver/pkg/driver"
-	"github.com/deckhouse/virtualization-csi-driver/pkg/host"
-	"github.com/deckhouse/virtualization-csi-driver/pkg/logger"
+	"github.com/deckhouse/virtualization-csi-driver/internal/driver"
+	"github.com/deckhouse/virtualization-csi-driver/internal/host"
+	"github.com/deckhouse/virtualization-csi-driver/internal/logger"
 )
 
 func main() {
