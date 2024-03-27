@@ -67,7 +67,7 @@ helm install csi deploy/guest/
 
 ## Examples 
 
-Examples of pvc are represented in _images/virtualization-csi-driver/samples_ directory.
+Examples of pvc are represented in _examples_ directory.
 
 ## Restrictions
 
