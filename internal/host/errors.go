@@ -7,4 +7,5 @@ var (
 	ErrAttachmentAlreadyDeleted = errors.New("attachment already exists")
 	ErrAttachmentNotFound       = errors.New("attachment not found")
 	ErrDiskNotFound             = errors.New("disk not found")
+	ErrVMNotFound               = errors.New("virtual machine not found")
 )

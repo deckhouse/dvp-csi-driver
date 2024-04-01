@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/container-storage-interface/spec v1.9.0
-	github.com/deckhouse/virtualization/api v0.0.0-20240322122516-cd942696adfb
+	github.com/deckhouse/virtualization/api v0.0.0-20240401103149-1e1d1d0a48e2
 	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.3.1
 	google.golang.org/grpc v1.58.3

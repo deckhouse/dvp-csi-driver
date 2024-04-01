@@ -7,10 +7,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/deckhouse/virtualization-csi-driver/internal/entities"
 	"github.com/deckhouse/virtualization/api/core/v1alpha2"
 )
 
-func (c *Client) DeleteDisk(ctx context.Context, vmdName string) (*Disk, error) {
+func (c *Client) DeleteDisk(ctx context.Context, vmdName string) (*entities.Disk, error) {
 	var vmd v1alpha2.VirtualMachineDisk
 
 	err := c.crClient.Get(ctx, types.NamespacedName{
@@ -30,7 +31,7 @@ func (c *Client) DeleteDisk(ctx context.Context, vmdName string) (*Disk, error) 
 		return nil, err
 	}
 
-	return &Disk{Name: vmdName}, nil
+	return &entities.Disk{Name: vmdName}, nil
 }
 
 func (c *Client) WaitDiskDeletion(ctx context.Context, vmdName string) error {

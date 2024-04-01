@@ -6,10 +6,11 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/deckhouse/virtualization-csi-driver/internal/entities"
 	"github.com/deckhouse/virtualization/api/core/v1alpha2"
 )
 
-func (c *Client) DetachDisk(ctx context.Context, vmdName, vmName string) (*Attachment, error) {
+func (c *Client) DetachDisk(ctx context.Context, vmdName, vmName string) (*entities.Attachment, error) {
 	vmbda, err := c.getVMBDA(ctx, vmdName, vmName)
 	if err != nil {
 		if errors.Is(err, ErrAttachmentNotFound) {
@@ -24,7 +25,7 @@ func (c *Client) DetachDisk(ctx context.Context, vmdName, vmName string) (*Attac
 		return nil, err
 	}
 
-	return &Attachment{Name: vmbda.Name}, nil
+	return &entities.Attachment{Name: vmbda.Name}, nil
 }
 
 func (c *Client) WaitDiskDetaching(ctx context.Context, attachmentName string) error {

@@ -9,15 +9,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/deckhouse/virtualization-csi-driver/internal/entities"
 	"github.com/deckhouse/virtualization/api/core/v1alpha2"
 )
 
-type Disk struct {
-	Name     string
-	Capacity resource.Quantity
-}
-
-func (c *Client) CreateDisk(ctx context.Context, name string, size int64, storageClass *string) (*Disk, error) {
+func (c *Client) CreateDisk(ctx context.Context, name string, size int64, storageClass *string) (*entities.Disk, error) {
 	vmd := v1alpha2.VirtualMachineDisk{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       v1alpha2.VMDKind,
@@ -40,7 +36,7 @@ func (c *Client) CreateDisk(ctx context.Context, name string, size int64, storag
 		return nil, err
 	}
 
-	return &Disk{
+	return &entities.Disk{
 		Name: vmd.Name,
 	}, nil
 }

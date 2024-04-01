@@ -15,12 +15,13 @@ rules:
   - virtualmachineblockdeviceattachments
   verbs:
   - create
+  - update
   - delete
   - get
-  - list
 - apiGroups:
     - virtualization.deckhouse.io
   resources:
+    - virtualmachines/status
     - virtualmachinedisks/status
     - virtualmachineblockdeviceattachments/status
   verbs:

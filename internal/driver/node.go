@@ -105,10 +105,22 @@ func (d *Driver) NodeGetCapabilities(_ context.Context, _ *csi.NodeGetCapabiliti
 	}, nil
 }
 
-func (d *Driver) NodeGetInfo(_ context.Context, _ *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+const maxVolumesPerNodeTotal = 16
+
+func (d *Driver) NodeGetInfo(ctx context.Context, _ *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	count, err := d.hostCluster.GetBlockDeviceCount(ctx, d.nodeName)
+	if err != nil {
+		return nil, err
+	}
+
+	var maxVolumesPerNode int
+	if count > 0 && count <= maxVolumesPerNodeTotal {
+		maxVolumesPerNode = maxVolumesPerNodeTotal - count
+	}
+
 	return &csi.NodeGetInfoResponse{
 		NodeId:             d.nodeName,
-		MaxVolumesPerNode:  10,
+		MaxVolumesPerNode:  int64(maxVolumesPerNode),
 		AccessibleTopology: &csi.Topology{},
 	}, nil
 }

@@ -7,10 +7,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/deckhouse/virtualization-csi-driver/internal/entities"
 	"github.com/deckhouse/virtualization/api/core/v1alpha2"
 )
 
-func (c *Client) GetDisk(ctx context.Context, vmdName string) (*Disk, error) {
+func (c *Client) GetDisk(ctx context.Context, vmdName string) (*entities.Disk, error) {
 	var vmd v1alpha2.VirtualMachineDisk
 
 	err := c.crClient.Get(ctx, types.NamespacedName{
@@ -25,17 +26,12 @@ func (c *Client) GetDisk(ctx context.Context, vmdName string) (*Disk, error) {
 		return nil, err
 	}
 
-	err = c.crClient.Delete(ctx, &vmd)
-	if err != nil {
-		return nil, err
-	}
-
 	capacity, err := resource.ParseQuantity(vmd.Status.Capacity)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Disk{
+	return &entities.Disk{
 		Name:     vmd.Name,
 		Capacity: capacity,
 	}, nil

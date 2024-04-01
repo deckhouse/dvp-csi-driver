@@ -8,29 +8,22 @@ import (
 	"github.com/google/uuid"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/deckhouse/virtualization/api/core/v1alpha2"
+
+	"github.com/deckhouse/virtualization-csi-driver/internal/entities"
 )
 
-const (
-	attachmentDiskNameLabel    = "virtualMachineDiskName"
-	attachmentMachineNameLabel = "virtualMachineName"
-)
-
-type Attachment struct {
-	Name string
-}
-
-func (c *Client) AttachDisk(ctx context.Context, vmdName, vmName string) (*Attachment, error) {
+func (c *Client) AttachDisk(ctx context.Context, vmdName, vmName string) (*entities.Attachment, error) {
 	vmbda, err := c.getVMBDA(ctx, vmdName, vmName)
-	if vmbda != nil && err == nil {
-		return &Attachment{Name: vmbda.Name}, nil
-	}
-
 	if err != nil && !errors.Is(err, ErrAttachmentNotFound) {
 		return nil, err
+	}
+
+	if vmbda != nil && err == nil {
+		return &entities.Attachment{Name: vmbda.Name}, nil
 	}
 
 	vmbda = &v1alpha2.VirtualMachineBlockDeviceAttachment{
@@ -41,10 +34,6 @@ func (c *Client) AttachDisk(ctx context.Context, vmdName, vmName string) (*Attac
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "vmbda-" + uuid.New().String(),
 			Namespace: c.namespace,
-			Labels: map[string]string{
-				attachmentDiskNameLabel:    vmdName,
-				attachmentMachineNameLabel: vmName,
-			},
 		},
 		Spec: v1alpha2.VirtualMachineBlockDeviceAttachmentSpec{
 			VMName: vmName,
@@ -62,7 +51,7 @@ func (c *Client) AttachDisk(ctx context.Context, vmdName, vmName string) (*Attac
 		return nil, err
 	}
 
-	return &Attachment{Name: vmbda.Name}, nil
+	return &entities.Attachment{Name: vmbda.Name}, nil
 }
 
 func (c *Client) WaitDiskAttaching(ctx context.Context, attachmentName string) error {
@@ -77,27 +66,48 @@ func (c *Client) WaitDiskAttaching(ctx context.Context, attachmentName string) e
 }
 
 func (c *Client) getVMBDA(ctx context.Context, vmdName, vmName string) (*v1alpha2.VirtualMachineBlockDeviceAttachment, error) {
-	selector, err := labels.Parse(fmt.Sprintf("%s=%s,%s=%s", attachmentDiskNameLabel, vmdName, attachmentMachineNameLabel, vmName))
+	var vm v1alpha2.VirtualMachine
+
+	err := c.crClient.Get(ctx, types.NamespacedName{
+		Namespace: c.namespace,
+		Name:      vmName,
+	}, &vm)
 	if err != nil {
 		return nil, err
 	}
 
-	var vmbdas v1alpha2.VirtualMachineBlockDeviceAttachmentList
-	err = c.crClient.List(ctx, &vmbdas, &client.ListOptions{
-		LabelSelector: selector,
-		Namespace:     c.namespace,
-	})
+	var vmbdaName string
+
+	for _, bda := range vm.Status.BlockDevicesAttached {
+		if !bda.Hotpluggable || bda.VirtualMachineBlockDeviceAttachment == nil {
+			continue
+		}
+
+		if bda.Type != v1alpha2.DiskDevice || bda.VirtualMachineDisk == nil || bda.VirtualMachineDisk.Name != vmdName {
+			continue
+		}
+
+		vmbdaName = bda.VirtualMachineBlockDeviceAttachment.Name
+		break
+	}
+
+	if vmbdaName == "" {
+		return nil, fmt.Errorf("disk %s isn't hot plugged to virtual machine %s: %w", vmdName, vmName, ErrAttachmentNotFound)
+	}
+
+	var vmbda v1alpha2.VirtualMachineBlockDeviceAttachment
+
+	err = c.crClient.Get(ctx, types.NamespacedName{
+		Name:      vmbdaName,
+		Namespace: c.namespace,
+	}, &vmbda)
 	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil, ErrAttachmentNotFound
+		}
+
 		return nil, err
 	}
 
-	if len(vmbdas.Items) == 0 {
-		return nil, ErrAttachmentNotFound
-	}
-
-	if len(vmbdas.Items) != 1 {
-		return nil, errors.New("more attachments found than expected: please report a bug")
-	}
-
-	return &vmbdas.Items[0], nil
+	return &vmbda, nil
 }
