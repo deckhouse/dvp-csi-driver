@@ -16,8 +16,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 
-	"github.com/deckhouse/virtualization-csi-driver/internal/host"
-	"github.com/deckhouse/virtualization-csi-driver/internal/mounter"
+	"github.com/deckhouse/dvp-csi-driver/internal/host"
+	"github.com/deckhouse/dvp-csi-driver/internal/mounter"
 )
 
 type Driver struct {

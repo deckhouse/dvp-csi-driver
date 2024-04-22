@@ -9,10 +9,10 @@ RUN go mod download
 # Build csi driver.
 RUN rm -rf /app
 ADD . /app
-RUN GOOS=linux go build -o virtualization-csi-driver ./cmd/virtualization-csi-driver
+RUN GOOS=linux go build -o dvo-csi-driver ./cmd/dvp-csi-driver
 
 FROM alpine:3.18
 RUN apk add --no-cache e2fsprogs xfsprogs findmnt blkid
-COPY --from=builder /app/virtualization-csi-driver /
+COPY --from=builder /app/dvp-csi-driver /
 
-ENTRYPOINT ["/virtualization-csi-driver"]
+ENTRYPOINT ["/dvp-csi-driver"]

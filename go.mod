@@ -1,4 +1,4 @@
-module github.com/deckhouse/virtualization-csi-driver
+module github.com/deckhouse/dvp-csi-driver
 
 go 1.21
 
