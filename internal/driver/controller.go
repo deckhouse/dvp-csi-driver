@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/deckhouse/virtualization-csi-driver/internal/host"
+	"github.com/deckhouse/dvp-csi-driver/internal/host"
 )
 
 var _ csi.ControllerServer = &Driver{}

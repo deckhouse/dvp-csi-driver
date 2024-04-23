@@ -5,8 +5,8 @@ version: "3"
 silent: true
 
 env:
-  CSI_IMAGE: dev-registry.deckhouse.io/virt/dev/virtualization-csi-driver:latest
-  CSI_BUILDER_IMAGE: virtualization-csi-driver-builder:latest
+  CSI_IMAGE: dev-registry.deckhouse.io/virt/dev/dvp-csi-driver:latest
+  CSI_BUILDER_IMAGE: dvp-csi-driver-builder:latest
 
 tasks:
   build:cache:
